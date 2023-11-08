@@ -6,12 +6,12 @@ require "nokogiri"
 require "http"
 
 class MlScraper
-  def initialize
+  def initialize(key)
     # Initilize the driver with our desired browser
     @driver = Selenium::WebDriver.for :chrome
 
     # Define search string
-    @search_str = "carros 4x4 diesel"
+    @search_str = key.to_s
 
     # Navigate to mercadolibre
     @driver.get "https://vfm-makler.de/suche/"  #"https://vfm-makler.de/suche/"
@@ -57,7 +57,15 @@ class ScrapingOrganizer
     include Interactor
 
     def call
-      search_by_zip("71364")
+      # search_by_zip("71364")
+      search_by_zip(context.search_str)
+
+      not_found_content = context.wait.until do
+        context.driver.find_elements(xpath: "//*[contains(text(), 'Mit dem Suchbegriff')]")
+      end
+
+      return unless not_found_content.empty?
+
       companies_data = get_all_companies_data
       get_all_employees_data(companies_data)
     end
@@ -113,19 +121,20 @@ class ScrapingOrganizer
       about_us_prefix = "ueber-uns/"
 
       companies_data.each do |url, company_data|
-        # next unless company_data[:broker] == "VMW GMBH"
+        # next unless company_data[:broker] == "WAGNER GMBH"
 
         unparsed_page = HTTP.get(url + about_us_prefix).to_s
         parsed_page = Nokogiri::HTML(unparsed_page)
         employee_elements = parsed_page.css('div.row.row-cols-1.row-cols-md-2.row-cols-xl-3.row-cols-xxl-4').first.children
 
         employee_elements.each do |element|
-          employee_data = company_data
+          employee_data = company_data.dup
           element.css('div.member').children.each do |employee|
             next if employee.children.first.name == "img"
             employee_data[:user_full_name] = employee.text.gsub("\n", "") if employee.classes.include?("name")
-            employee_data[:user_positions] = employee_data[:user_positions] || ""
-            employee_data[:user_positions] = employee_data[:user_positions] + ", " + employee.text.gsub("\n", "") if employee.name == "p" && employee.children.first.name == "text" && !employee.text.empty?
+            if employee.name == "p" && employee.children.first.name == "text" && !employee.text.empty?
+              employee_data[:user_positions] ||= employee.children.first.text.gsub("\n", "")
+            end
 
             if employee.name == "p" && employee.children.first.name == "span"
               employee.children.each do |x|
@@ -147,8 +156,8 @@ class ScrapingOrganizer
             employee_data[:user_full_name],
             employee_data[:user_positions].gsub(/^,\s/, ""),
             employee_data[:user_email],
-            employee_data[:user_phone],
-            employee_data[:user_fax],
+            employee_data[:phone]&.gsub(/\D/, "") == employee_data[:user_phone]&.gsub(/\D/, "") ? "empty for employees" : employee_data[:user_phone],
+            employee_data[:fax]&.gsub(/\D/, "") == employee_data[:user_fax]&.gsub(/\D/, "") ? "empty for employees" : employee_data[:user_fax],
             employee_data[:website],
             employee_data[:general_email],
           ]
@@ -174,4 +183,8 @@ class GermanScrapper
 end
 
 # Run program
-MlScraper.new.scrape
+(100_000..199_999).to_a.each do |key|
+# [465485, 71364].each do |key|
+  current_key = key.to_s[1..-1]
+  MlScraper.new(current_key).scrape
+end
