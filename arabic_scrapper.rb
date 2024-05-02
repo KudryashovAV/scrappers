@@ -154,7 +154,7 @@ class ScrapingOrganizer
 
     def harvester(context, data, file_name)
       collected_data = []
-      data.first(6).each do |data|
+      data.each do |data|
         link = data.first
 
         next if link == "Link,"
