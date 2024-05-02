@@ -83,7 +83,13 @@ class ScrapingOrganizer
       password_submit_button.last.click
 
       sleep 8
+    end
+  end
 
+  class ScrapingOrganizer::ScrollAndHarvest
+    include Interactor
+
+    def call
       screen_height = context.driver.execute_script("return window.screen.height;")
 
       x = 1
@@ -128,11 +134,58 @@ class ScrapingOrganizer
     end
   end
 
-  organize AcceptCookies, Login
+  class ScrapingOrganizer::HarvestPersonalData
+    include Interactor
+
+    def call
+      ceo_harvester(context)
+      founders_harvester(context)
+    end
+
+    private
+
+    def ceo_harvester(context)
+      harvester(context, CSV.read("ceo.csv"), "collected_ceo_data.csv")
+    end
+
+    def founders_harvester(context)
+      harvester(context, CSV.read("founders.csv"), "collected_founders_data.csv")
+    end
+
+    def harvester(context, data, file_name)
+      collected_data = []
+      data.first(6).each do |data|
+        link = data.first
+
+        next if link == "Link,"
+
+        context.driver.get(link)
+        sleep 3
+        personal_info = {}
+        personal_info["link"] = link
+        personal_info["name"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h2').first&.text || "no data"
+        personal_info["position"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h4[1]').first&.text || "no data"
+        personal_info["country"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h4[2]').first&.text || "no data"
+        personal_info["firm"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h3').first&.text || "no data"
+        personal_info["social"] = context.driver.find_elements(css: 'div.sc-9c9868a2-15.kzrhIj').first&.find_elements(:xpath => "*")&.map { |x| x.attribute("href") }&.join("########") || "no data"
+        personal_info["contacts"] = context.driver.find_elements(css: 'div.sc-901e7a18-2.eEIcVK').first&.find_elements(:xpath => "*")&.map { |x| x.text }&.join("########") || "no data"
+        collected_data << personal_info
+      end
+
+      CSV.open(file_name, "ab", write_headers: true, headers: %w[Link, FullName, Position, Country, Organization, Social, Contacts]) do |csv|
+        collected_data.each do |row|
+          csv << row.values
+        end
+      end
+    end
+  end
+
+  # organize AcceptCookies, Login, ScrollAndHarvest
+  organize AcceptCookies, Login, HarvestPersonalData
 end
 
 # Run program
-# MlScraper.new.scrape
+MlScraper.new.scrape
 
 
 class CSVProcessor
@@ -160,5 +213,4 @@ class CSVProcessor
   end
 end
 
-
-CSVProcessor.call
+# CSVProcessor.call
