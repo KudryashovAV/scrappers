@@ -12,7 +12,7 @@ class MlScraper
     @search_str = 'carros 4x4 diesel'
 
     # Navigate to mercadolibre
-    @driver.get 'https://app.seamless-expo.com/c/seamless-2/people/RXZlbnRWaWV3XzYzMzMzMA=='
+    @driver.get 'https://app.seamless-expo.com/event/seamless-middle-east-2024/people/RXZlbnRWaWV3XzY3MjA3OA==?filters=RmllbGREZWZpbml0aW9uXzY3OTY5OA%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODcwMA%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU0Mw%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODUzOA%253D%253D%3BRmllbGREZWZpbml0aW9uXzY3OTcwNg%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODU0Mg%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU0Ng%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU3OQ%253D%253D%3BRmllbGREZWZpbml0aW9uXzM5ODkzOA%253D%253D%3ARmllbGRWYWx1ZV8xNzg1MDE5OQ%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDIyNw%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDI1OA%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDI3Mw%253D%253D%3BRmllbGREZWZpbml0aW9uXzY3OTcwNA%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODUzNg%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODUzOQ%253D%253D'
 
     # Define global timeout threshold, when @wait is called, if the program
     # takes more than 10 secs to return something, we'll infer that somethig
@@ -99,15 +99,17 @@ class ScrapingOrganizer
 
         break if (screen_height) * x > scroll_height
         names_elements = context.wait.until do
-          context.driver.find_elements(xpath: "//*[contains(@class, 'container__List')]")
+          context.driver.find_elements(xpath: "//*[@id='__next']/div[3]/div/main/div/div[2]/div[2]/div/div/div")
         end
 
-        pp "names_elements"
-        pp names_elements.first.find_elements(:css, "a").count
+        puts "names_elements"
+        # debugger
+        puts names_elements.first.find_elements(:css, "a").count
+
 
         # byebug
 
-        diff = names_elements.first.find_elements(:css, "a").difference(old_elements)
+        diff = names_elements.first.find_elements(:css, "a") - (old_elements)
 
         unless diff.empty?
           array = []
@@ -119,20 +121,20 @@ class ScrapingOrganizer
             end
 
             info_element.find_elements(:css, "span").each do |span|
-              if span.attribute("class").match("FullName")
+              if span.attribute("class").match("sc-1fbfbd68-9")
                 info_hash["full_name"] = span.text || "no info"
-              elsif span.attribute("class").match("_Job-")
-                info_hash["job"] = span.text || "no info"
-              elsif span.attribute("class").match("Organization")
+              elsif span.attribute("class").match("sc-1fbfbd68-11")
+                info_hash["position"] = span.text || "no info"
+              elsif span.attribute("class").match("sc-1fbfbd68-12")
                 info_hash["organization"] = span.text || "no info"
               end
             end
 
             array << info_hash unless info_hash.empty?
           end
-
+          # debugger
           if old_elements.empty?
-            CSV.open("aaa.csv", "ab", write_headers: true, headers: %w[Link, FullName, Job, Organization]) do |csv|
+            CSV.open("aaa.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
               array.each do |row|
                 csv << row.values
               end
@@ -148,11 +150,11 @@ class ScrapingOrganizer
 
         old_elements = old_elements + diff
 
-        pp "diff.count"
-        pp diff.count
+        puts "diff.count"
+        puts diff.count
 
-        pp "old_elements.count"
-        pp old_elements.count
+        puts "old_elements.count"
+        puts old_elements.count
       end
     end
   end
@@ -192,10 +194,38 @@ class ScrapingOrganizer
     end
   end
 
-  organize AcceptCookies, Login, GetTitles
+  organize AcceptCookies, Login#, GetTitles
+end
+
+# Run program
+# MlScraper.new.scrape
+
+
+class CSVProcessor
+  def self.call
+    file_data = CSV.read("file_data.csv")
+
+    founders_data = []
+    ceo_data = []
+
+    file_data.each { |x| founders_data << x if x[2]&.match(/founder/i) }
+    file_data.each { |x| ceo_data << x if x[2]&.match(/ceo/i) }
+
+    CSV.open("founders.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+      founders_data.uniq.each do |row|
+        csv << row.values
+      end
+    end
+
+    CSV.open("ceo.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+      ceo_data.uniq.each do |row|
+        csv << row.values
+      end
+    end
+
+    debugger
+  end
 end
 
 
-
-# Run program
-MlScraper.new.scrape
+CSVProcessor.call
