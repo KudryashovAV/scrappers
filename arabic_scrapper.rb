@@ -12,7 +12,7 @@ class MlScraper
     @search_str = 'carros 4x4 diesel'
 
     # Navigate to mercadolibre
-    @driver.get 'https://app.seamless-expo.com/event/seamless-middle-east-2024/people/RXZlbnRWaWV3XzY3MjA3OA==?filters=RmllbGREZWZpbml0aW9uXzY3OTY5OA%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODcwMA%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU0Mw%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODUzOA%253D%253D%3BRmllbGREZWZpbml0aW9uXzY3OTcwNg%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODU0Mg%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU0Ng%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODU3OQ%253D%253D%3BRmllbGREZWZpbml0aW9uXzM5ODkzOA%253D%253D%3ARmllbGRWYWx1ZV8xNzg1MDE5OQ%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDIyNw%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDI1OA%253D%253D%2CRmllbGRWYWx1ZV8xNzg1MDI3Mw%253D%253D%3BRmllbGREZWZpbml0aW9uXzY3OTcwNA%253D%253D%3ARmllbGRWYWx1ZV8yMjkyODUzNg%253D%253D%2CRmllbGRWYWx1ZV8yMjkyODUzOQ%253D%253D'
+    @driver.get 'https://app.seamless-expo.com/event/seamless-middle-east-2024/people/RXZlbnRWaWV3XzY3MjA3OA=='
 
     # Define global timeout threshold, when @wait is called, if the program
     # takes more than 10 secs to return something, we'll infer that somethig
@@ -126,7 +126,7 @@ class ScrapingOrganizer
         end
       end
 
-      CSV.open("aaa.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+      CSV.open("all_data.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
         data.each do |row|
           csv << row.values
         end
@@ -180,8 +180,8 @@ class ScrapingOrganizer
     end
   end
 
-  # organize AcceptCookies, Login, ScrollAndHarvest
-  organize AcceptCookies, Login, HarvestPersonalData
+  organize AcceptCookies, Login, ScrollAndHarvest # 1 stage - get all users info
+  # organize AcceptCookies, Login, HarvestPersonalData # 3 stage - get additional data from harvested and filtered data
 end
 
 # Run program
@@ -190,13 +190,15 @@ MlScraper.new.scrape
 
 class CSVProcessor
   def self.call
-    file_data = CSV.read("aaa.csv")
+    file_data = CSV.read("all_data.csv")
 
     founders_data = []
     ceo_data = []
+    others_data = []
 
     file_data.each { |x| founders_data << x if x[2]&.match(/founder/i) }
     file_data.each { |x| ceo_data << x if x[2]&.match(/ceo/i) && !founders_data.include?(x) }
+    file_data.each { |x| others_data << x if !ceo_data.include?(x) && !founders_data.include?(x) }
 
     CSV.open("founders.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
       founders_data.uniq.each do |row|
@@ -210,7 +212,14 @@ class CSVProcessor
         csv << row
       end
     end
+
+    CSV.open("others.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+      others_data.uniq.each do |row|
+
+        csv << row
+      end
+    end
   end
 end
 
-# CSVProcessor.call
+# CSVProcessor.call # 2 stage - filter data
