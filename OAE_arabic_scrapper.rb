@@ -159,10 +159,11 @@ class ScrapingOrganizer
       data.each do |data|
         link = data.first
 
-        next if link == "Link,"
+        next if link == "Link"
 
         context.driver.get(link)
         sleep 3
+        debugger
         personal_info = {}
         personal_info["link"] = link
         personal_info["name"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h2').first&.text || "no data"
@@ -182,25 +183,39 @@ class ScrapingOrganizer
     end
   end
 
-  organize AcceptCookies, Login, ScrollAndHarvest # 1 stage - get all users info
-  # organize AcceptCookies, Login, HarvestPersonalData # 3 stage - get additional data from harvested and filtered data
+  # organize AcceptCookies, Login, ScrollAndHarvest # 1 stage - get all users info
+  organize AcceptCookies, Login, HarvestPersonalData # 3 stage - get additional data from harvested and filtered data
 end
 
 # Run program
-# MlScraper.new.scrape
+MlScraper.new.scrape
 
 
 class CSVProcessor
   def self.call
-    file_data = CSV.read("all_data.csv")
+    # file_data = CSV.read("all_data.csv")
+    puts "Start to read at #{Time.now}"
+    file_data = []
+    CSV.foreach("all_data.csv", :headers => true) do |row|
+      file_data << row
+    end
 
     founders_data = []
     ceo_data = []
     others_data = []
 
-    file_data.each { |x| founders_data << x if x[1]&.match(/founder/i) }
-    file_data.each { |x| ceo_data << x if x[1]&.match(/ceo/i) && !founders_data.include?(x) }
-    file_data.each { |x| others_data << x if !ceo_data.include?(x) && !founders_data.include?(x) }
+    count = 0
+
+    file_data.each do |row|
+      count += 1
+      puts "Total: #{file_data.count} / Processed: #{count} / Left: #{file_data.count - count}"
+      founders_data << row.to_h if row[1]&.match(/founder/i)
+      ceo_data << row.to_h if row[1]&.match(/ceo/i) && !row[1]&.match(/founder/i)
+      others_data << row if !row[1]&.match(/ceo/i) && !row[1]&.match(/founder/i)
+    end
+
+    puts "Finish to read at #{Time.now}"
+    puts "Start to write read at #{Time.now}"
 
     CSV.open("founders.csv", "ab", write_headers: true, headers: %w[Link Info]) do |csv|
       founders_data.uniq.each do |row|
@@ -221,9 +236,8 @@ class CSVProcessor
         csv << row
       end
     end
-
-    debugger
+    puts "Finish to write at #{Time.now}"
   end
 end
 
-CSVProcessor.call # 2 stage - filter data
+# CSVProcessor.call # 2 stage - filter data
