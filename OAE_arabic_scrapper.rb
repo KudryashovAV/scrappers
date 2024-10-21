@@ -12,7 +12,7 @@ class MlScraper
     @search_str = 'carros 4x4 diesel'
 
     # Navigate to mercadolibre
-    @driver.get 'https://app.seamless-expo.com/event/seamless-middle-east-2024/people/RXZlbnRWaWV3XzY3MjA3OA=='
+    @driver.get 'https://app.seamless-expo.com/event/seamless-saudi-arabia-2024/people/RXZlbnRWaWV3XzY3MjEyMw=='
 
     # Define global timeout threshold, when @wait is called, if the program
     # takes more than 10 secs to return something, we'll infer that somethig
@@ -76,8 +76,9 @@ class ScrapingOrganizer
       end
       password_input.send_keys("TapZykfoTapZykfo1")
 
+      # //*[@id="login-form"]/button/span
       password_submit_button = context.wait.until do
-        context.driver.find_elements(xpath: "//*[contains(text(), 'Continue')]")
+        context.driver.find_elements(xpath: "//*[contains(text(), 'Log in')]")
       end
 
       password_submit_button.last.click
@@ -94,41 +95,42 @@ class ScrapingOrganizer
 
       x = 1
 
-      data = []
+      global_data = []
       while true do
+        data = []
         context.driver.execute_script("window.scrollTo(0, #{screen_height*x});")
         x += 1
         sleep(2)
 
         scroll_height = context.driver.execute_script("return document.body.scrollHeight;")
 
-        if (screen_height) * x > scroll_height
-          names_elements = context.wait.until do
-            context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div/div[2]/div/div/div/div')
-          end
-
-          links = names_elements.first.find_elements(:css, "a")
-
-          puts "link elements #{links.count}"
-
-          links.each do |link|
-            info_hash = {}
-
-            info_hash["link"] = link.attribute("href") || "no link"
-            info_hash["full_name"] = link.find_elements(:xpath => "*").first.find_elements(:xpath => "*").first.find_elements(:css => "span.sc-a13c392f-0")[0]&.text || "no info"
-            info_hash["position"] = link.find_elements(:xpath => "*").first.find_elements(:xpath => "*").first.find_elements(:css => "span.sc-a13c392f-0")[1]&.text || "no info"
-            info_hash["firm"] = link.find_elements(:xpath => "*").first.find_elements(:xpath => "*").first.find_elements(:css => "span.sc-a13c392f-0")[2]&.text || "no info"
-
-            data << info_hash unless info_hash.empty?
-          end
-
-          break
+        names_elements = context.wait.until do
+          context.driver.find_elements(class: "infinite-scroll-component")
         end
-      end
 
-      CSV.open("all_data.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
-        data.each do |row|
-          csv << row.values
+        links = names_elements.first.find_elements(:css, "a")
+
+        puts "Iteration #{x}"
+
+        links.each do |link|
+          info_hash = {}
+          info_hash["link"] = link.attribute("href") || "no link"
+          info_hash["info"] = link.text.gsub("\n", " ") || "no info"
+
+          data << info_hash unless info_hash.empty?
+          global_data << info_hash unless info_hash.empty?
+        end
+
+        puts "global count #{global_data.count}"
+
+        CSV.open("all_data.csv", "ab") do |csv|
+          data.each do |row|
+            csv << row.values
+          end
+        end
+
+        if screen_height * x > scroll_height
+          break
         end
       end
     end
@@ -185,7 +187,7 @@ class ScrapingOrganizer
 end
 
 # Run program
-MlScraper.new.scrape
+# MlScraper.new.scrape
 
 
 class CSVProcessor
@@ -196,30 +198,32 @@ class CSVProcessor
     ceo_data = []
     others_data = []
 
-    file_data.each { |x| founders_data << x if x[2]&.match(/founder/i) }
-    file_data.each { |x| ceo_data << x if x[2]&.match(/ceo/i) && !founders_data.include?(x) }
+    file_data.each { |x| founders_data << x if x[1]&.match(/founder/i) }
+    file_data.each { |x| ceo_data << x if x[1]&.match(/ceo/i) && !founders_data.include?(x) }
     file_data.each { |x| others_data << x if !ceo_data.include?(x) && !founders_data.include?(x) }
 
-    CSV.open("founders.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+    CSV.open("founders.csv", "ab", write_headers: true, headers: %w[Link Info]) do |csv|
       founders_data.uniq.each do |row|
         csv << row
       end
     end
 
-    CSV.open("ceo.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+    CSV.open("ceo.csv", "ab", write_headers: true, headers: %w[Link Info]) do |csv|
       ceo_data.uniq.each do |row|
 
         csv << row
       end
     end
 
-    CSV.open("others.csv", "ab", write_headers: true, headers: %w[Link, FullName, Position, Organization]) do |csv|
+    CSV.open("others.csv", "ab", write_headers: true, headers: %w[Link Info]) do |csv|
       others_data.uniq.each do |row|
 
         csv << row
       end
     end
+
+    debugger
   end
 end
 
-# CSVProcessor.call # 2 stage - filter data
+CSVProcessor.call # 2 stage - filter data
