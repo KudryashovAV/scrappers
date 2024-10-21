@@ -163,16 +163,16 @@ class ScrapingOrganizer
 
         context.driver.get(link)
         sleep 3
-        debugger
+
         personal_info = {}
         personal_info["link"] = link
-        personal_info["name"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h2').first&.text || "no data"
-        personal_info["position"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h4[1]').first&.text || "no data"
-        personal_info["country"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h4[2]').first&.text || "no data"
-        personal_info["firm"] = context.driver.find_elements(xpath: '//*[@id="__next"]/div[3]/div/main/div[2]/div/div[2]/h3').first&.text || "no data"
-        personal_info["social"] = context.driver.find_elements(css: 'div.sc-9c9868a2-15.kzrhIj').first&.find_elements(:xpath => "*")&.map { |x| x.attribute("href") }&.join("########") || "no data"
-        personal_info["contacts"] = context.driver.find_elements(css: 'div.sc-901e7a18-2.eEIcVK').first&.find_elements(:xpath => "*")&.map { |x| x.text }&.join("########") || "no data"
-        collected_data << personal_info
+        personal_info["name"] = context.driver.find_elements(class: 'sc-f3b80a80-1').first&.text || "no data"
+        personal_info["position"] = context.driver.find_elements(xpath: '/html/body/div[2]/div[3]/div/main/div[2]/div/div[1]/h4[1]').first&.text || "no data"
+        personal_info["country"] = context.driver.find_elements(xpath: '/html/body/div[2]/div[3]/div/main/div[2]/div/div[1]/h4[2]').first&.text || "no data"
+        personal_info["firm"] = context.driver.find_elements(xpath: '/html/body/div[2]/div[3]/div/main/div[2]/div/div[1]/h3').first&.text || "no data"
+        personal_info["social"] = context.driver.find_elements(xpath: '/html/body/div[2]/div[3]/div/main/div[2]/div/div[15]').first&.find_elements(:xpath => "*")&.map { |x| x.attribute("href") }&.compact&.join("########") || "no data"
+        personal_info["contacts"] = context.driver.find_elements(css: 'div.sc-901e7a18-2.eEIcVK').first&.find_elements(:xpath => "*")&.map { |x| x.text }&.compact&.join("########") || "no data"
+        collected_data << personal_info if personal_info["social"] != "no data" || personal_info["contacts"] != "no data"
       end
 
       CSV.open(file_name, "ab", write_headers: true, headers: %w[Link, FullName, Position, Country, Organization, Social, Contacts]) do |csv|
